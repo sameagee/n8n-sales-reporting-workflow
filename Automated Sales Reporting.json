@@ -1,0 +1,222 @@
+{
+  "name": "Automated Sales Reporting",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\n\nconst csv = input.data ?? input.body;\n\nif (typeof csv !== \"string\") {\n  throw new Error(\n    \"CSV text not found. Available fields: \" +\n    Object.keys(input).join(\", \")\n  );\n}\n\nconst lines = csv.trim().split(/\\r?\\n/);\nconst headers = lines[0].split(\",\");\n\nconst records = lines.slice(1).filter(line => line.trim() !== \"\").map(line => {\n  const values = line.split(\",\");\n  const record = {};\n\n  headers.forEach((header, index) => {\n    record[header.trim()] = values[index]?.trim();\n  });\n\n  record.units = Number(record.units);\n  record.revenue_usd = Number(record.revenue_usd);\n  record.expense_usd = Number(record.expense_usd);\n\n  return { json: record };\n});\n\nreturn records;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        48
+      ],
+      "id": "032a61e6-abf9-497b-b316-a77167415bf5",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "url": "https://raw.githubusercontent.com/sameagee/n8n-sales-reporting-workflow/main/sample-sales-data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -80,
+        64
+      ],
+      "id": "f92c82fa-d3aa-4381-b92d-2ee020cd0f8b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst records = $input.all().map(item => item.json);\n\nif (records.length === 0) {\n  throw new Error(\"No sales records received from the CSV Conversion node.\");\n}\n\nconst totalRecords = records.length;\n\nconst totalUnits = records.reduce(\n  (sum, r) => sum + Number(r.units || 0), 0\n);\n\nconst totalRevenue = records.reduce(\n  (sum, r) => sum + Number(r.revenue_usd || 0), 0\n);\n\nconst totalExpenses = records.reduce(\n  (sum, r) => sum + Number(r.expense_usd || 0), 0\n);\n\nreturn [{\n  json: {\n    report_name: \"Automated Sales Report\",\n    records_processed: totalRecords,\n    total_units_sold: totalUnits,\n    total_revenue_usd: Number(totalRevenue.toFixed(2)),\n    total_expenses_usd: Number(totalExpenses.toFixed(2)),\n    estimated_profit_usd: Number(\n      (totalRevenue - totalExpenses).toFixed(2)\n    )\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "15bae650-eacc-497c-93c3-6cc40c9a8c97",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        80
+      ],
+      "id": "9744bb96-c915-452a-9124-d45216302041",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1a3S4KdX1A722f1XebKpnmlDsHw9XwGTdr6Q_3r_aaV4/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Report Name": "={{ $json.report_name }}",
+            "Records": "={{ $json.records_processed }}",
+            "Units Sold": "={{ $json.total_units_sold }}",
+            "Revenue": "={{ $json.total_revenue_usd }}",
+            "Expenses": "={{ $json.total_expenses_usd }}",
+            "Profit": "={{ $json.estimated_profit_usd }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Report Name",
+              "displayName": "Report Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Records",
+              "displayName": "Records",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Units Sold",
+              "displayName": "Units Sold",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Revenue",
+              "displayName": "Revenue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Expenses",
+              "displayName": "Expenses",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Profit",
+              "displayName": "Profit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        400,
+        48
+      ],
+      "id": "647e2851-a1a4-4998-9219-cd4cbea855e4",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Ua6gtRU7hyASAKUt",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4bf33bb8-9389-4639-b742-1ea569447d70",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2b9373f3d384a0723ba04952c52f9071de35ddd9653460ffd29972b88d2733c0"
+  },
+  "nodeGroups": [],
+  "id": "jvo9KG9INFJcglVS",
+  "tags": []
+}
